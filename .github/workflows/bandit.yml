@@ -1,0 +1,48 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+# Bandit is a security linter designed to find common security issues in Python code.
+# This action will run Bandit on your codebase.
+# The results of the scan will be found under the Security tab of your repository.
+
+# https://github.com/marketplace/actions/bandit-scan is ISC licensed, by abirismyname
+# https://pypi.org/project/bandit/ is Apache v2.0 licensed, by PyCQA
+
+name: Bandit Security Scan
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+  workflow_dispatch:
+
+jobs:
+  bandit_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with: 
+          python-version: '3.x'
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit on code
+        run: bandit -r . -ll -o bandit_output.txt || true   
+
+      - name: Process results
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+        run: |
+          if grep -q "Severity: High" bandit_output.txt; then
+            gh pr comment $PR_NUMBER --body "Blocked: High-severity vulnerabilities detected."
+            exit 1
+          else
+            gh pr comment $PR_NUMBER --body "Successful: No issues found."
+            gh pr merge $PR_NUMBER --merge
+          fi
